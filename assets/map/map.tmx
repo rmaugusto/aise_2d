@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.1" orientation="orthogonal" renderorder="right-down" width="34" height="24" tilewidth="32" tileheight="32" infinite="0" nextlayerid="2" nextobjectid="1">
+ <tileset firstgid="1" source="nature.tsx"/>
+ <layer id="1" name="full_map" width="34" height="24">
+  <data encoding="base64" compression="zlib">
+   eJzl1UsOABAMRdFuh/0v0AoI7e0Hg44EJ80rTURa0eqKmu2PNKwcWme0owN3U84Mx+laVYc1R14OKt+0g5g17T7vN9BqynAQZ1Vw0Jl70UFl9TaH1+xT2dD2g+pjhmXnn4jw7Dp+rQHwkYS/
+  </data>
+ </layer>
+</map>
