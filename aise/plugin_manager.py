@@ -4,10 +4,19 @@
 class PluginManager:
     def __init__(self):
         self.loaded_plugins = []
+        self.first_update = False
 
     def load_plugins(self, aise_context):
         from plugins.fish.fish import FishPlugin
-        self.loaded_plugins.append(FishPlugin())
+        self.loaded_plugins.append(FishPlugin(aise_context))
+
+    def setup_plugins(self):
+        for plugin in self.loaded_plugins:
+            plugin.setup()
+
+    def init_plugins(self):
+        for plugin in self.loaded_plugins:
+            plugin.init()
 
     def update_plugins(self, delta_time):
         for plugin in self.loaded_plugins:

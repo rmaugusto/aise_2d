@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import arcade
 import pymunk
+from context import AiseContext
 
 from entity import SegmentData
 
@@ -10,40 +11,44 @@ SENSOR_REACH = 80
 
 class Sensor:
     def __init__(self, ref_sprite: Optional[arcade.Sprite]) -> None:
-        self.body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
-        self.shape = SegmentData(self.body, [0, 0], [900, 0], 0.0)
-        self.shape.collision_type = 0
-        self.shape.sensor = True
-        self.shape.properties["sprite"] = ref_sprite
         self.distance = 0.0
+        self.sensor_pos = pymunk.Vec2d(0, 0)
+        self.sprite = ref_sprite
+        self.collision_pos = None
+        self.distance = SENSOR_REACH
 
     def draw(self) -> None:
-        pv1 = self.body.position + self.shape.a.rotated(self.body.angle)
-        pv2 = self.body.position + self.shape.b.rotated(self.body.angle)
-        arcade.draw_line(pv1.x, pv1.y, pv2.x, pv2.y, arcade.color.RED, 1)
+        arcade.draw_line(self.sprite.center_x, self.sprite.center_y,
+                         self.sensor_pos.x, self.sensor_pos.y, arcade.color.RED, 1)
+
+        if self.collision_pos:
+            arcade.draw_circle_filled(
+                self.collision_pos.x, self.collision_pos.y, 4, arcade.color.RED)
 
 
 class SensorSet:
 
-    SENSOR_SPACE = 20
+    SENSOR_SPACE = 35
 
-    def __init__(self, ref_sprite: Optional[arcade.Sprite]) -> None:
+    def __init__(self, ref_sprite: Optional[arcade.Sprite], count:int = 9) -> None:
         self.ref_sprite = ref_sprite
-        self.sensors:List[Sensor] = []
+        self.sensors: List[Sensor] = []
 
-        for i in range(0, 1):
+        for i in range(0, count):
             sensor = Sensor(ref_sprite)
-            sensor.body.angle = ref_sprite.angle
             self.sensors.append(sensor)
 
-    def update(self) -> None:
-        
+    def update(self, aise_context: AiseContext) -> None:
+
+        physics_sprite = aise_context.physics_engine.get_physics_object(
+            self.ref_sprite)
         center_ang = self.ref_sprite.angle+90
-        begin_ang = center_ang - ( (len(self.sensors)-1) * SensorSet.SENSOR_SPACE ) / 2
+        begin_ang = center_ang - \
+            ((len(self.sensors)-1) * SensorSet.SENSOR_SPACE) / 2
 
         for sensor in self.sensors:
 
-            angle = math.radians(begin_ang )
+            angle = math.radians(begin_ang)
 
             begin_ang += SensorSet.SENSOR_SPACE
 
@@ -53,17 +58,26 @@ class SensorSet:
             x2 = x1 + math.cos(angle) * SENSOR_REACH
             y2 = y1 + math.sin(angle) * SENSOR_REACH
 
-            sensor.shape.unsafe_set_endpoints((x1,y1), (x2,y2))
+            sensor.sensor_pos = pymunk.Vec2d(x2, y2)
+
+            ps = aise_context.physics_engine.space.segment_query(
+                (x1, y1), (x2, y2), 1, pymunk.ShapeFilter(mask=0b1001))
+
+            sensor.collision_pos = None
+            nearest_dist = SENSOR_REACH
+            
+            for p in ps:
+                if physics_sprite.shape != p.shape and p.alpha < nearest_dist:
+                    nearest_dist = p.alpha
+                    sensor.collision_pos = p.point
+                    sensor.distance = nearest_dist
 
     def draw(self) -> None:
         for sensor in self.sensors:
             sensor.draw()
 
-    def attach_space(self, space:pymunk.Space):
-        for sensor in self.sensors:
-            space.add(sensor.body, sensor.shape)
+    def attach_space(self, space: pymunk.Space):
+        pass
 
-    def remove_space(self, space:pymunk.Space):
-        for sensor in self.sensors:
-            space.remove(sensor.shape)
-            space.remove(sensor.body)
+    def remove_space(self, space: pymunk.Space):
+        pass

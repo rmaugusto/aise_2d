@@ -1,0 +1,5 @@
+plugins:
+  fish:
+    count: 10
+    sensor_count: 10
+    speed: 4000
