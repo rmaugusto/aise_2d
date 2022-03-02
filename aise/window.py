@@ -16,25 +16,6 @@ SCREEN_TITLE = "Artificial Intelligence Simulated Environment"
 SPRITE_SCALING_TILES = 1
 
 
-class FPSCounter:
-    def __init__(self):
-        self.time = time.perf_counter()
-        self.frame_times = collections.deque(maxlen=60)
-
-    def tick(self):
-        t1 = time.perf_counter()
-        dt = t1 - self.time
-        self.time = t1
-        self.frame_times.append(dt)
-
-    def get_fps(self):
-        total_time = sum(self.frame_times)
-        if total_time == 0:
-            return 0
-        else:
-            return len(self.frame_times) / sum(self.frame_times)
-
-
 class AiseWindow(arcade.Window):
 
     def __init__(self, aise_context: Optional[AiseContext] = None):
@@ -46,8 +27,6 @@ class AiseWindow(arcade.Window):
         self.aise_context = aise_context
 
         self.mouse_down = False
-
-        self.fps = FPSCounter()
 
         self.manager = arcade.gui.UIManager()
 
@@ -114,12 +93,11 @@ class AiseWindow(arcade.Window):
         self.camera_gui.use()
 
         # Draw the FPS
-        fps = self.fps.get_fps()
-        self.aise_context.system_panel.add_label(f"FPS: {fps:3.0f}")
+        self.aise_context.system_panel.add_label(
+            f"FPS: {arcade.get_fps(60):5.1f}")
         self.draw_data_panel()
         self.draw_system_panel()
         self.manager.draw()
-        self.fps.tick()
 
     def draw_data_panel(self):
         sorted_labels = dict(
@@ -130,12 +108,12 @@ class AiseWindow(arcade.Window):
         pw = 160
         ph = self.height
         pos = 0
-        arcade.draw_xywh_rectangle_filled(
-            ww-pw, wh-ph, pw, ph, (200, 200, 200, 130))
+        # arcade.draw_xywh_rectangle_filled(
+        #     ww-pw, wh-ph, pw, ph, (200, 200, 200, 130))
 
         for _, label in sorted_labels.items():
             arcade.draw_text(label, ww - pw + 10,
-                             wh - 20 - (pos * 20), arcade.color.BLACK, 12)
+                             wh - 20 - (pos * 20), arcade.color.WHITE, 12)
             pos += 1
 
         self.aise_context.data_panel.clear()
@@ -149,12 +127,12 @@ class AiseWindow(arcade.Window):
         pw = 160
         ph = self.height
         pos = 0
-        arcade.draw_xywh_rectangle_filled(
-            0, wh-ph, pw, ph, (200, 200, 200, 130))
+        # arcade.draw_xywh_rectangle_filled(
+        #     0, wh-ph, pw, ph, (200, 200, 200, 50))
 
         for _, label in sorted_labels.items():
             arcade.draw_text(label, 10,
-                             wh - 20 - (pos * 20), arcade.color.BLACK, 12)
+                             wh - 20 - (pos * 20), arcade.color.WHITE, 12)
             pos += 1
 
         self.aise_context.system_panel.clear()

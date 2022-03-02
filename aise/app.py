@@ -4,6 +4,7 @@ from context import AiseContext
 import arcade
 
 def main():
+    arcade.enable_timings()
     aise_context = AiseContext()
     aise_win = AiseWindow(aise_context)
     aise_win.setup()

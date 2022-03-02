@@ -5,8 +5,6 @@ import arcade
 import pymunk
 from context import AiseContext
 
-from entity import SegmentData
-
 SENSOR_REACH = 80
 
 class Sensor:

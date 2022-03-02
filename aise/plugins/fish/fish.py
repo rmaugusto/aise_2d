@@ -1,13 +1,14 @@
-import math
 from typing import Optional
 from xmlrpc.client import boolean
 import arcade
 import pymunk
+from ai.ai import Ai, Brain
 from sensor import Sensor, SensorSet
 from context import AiseContext
-from entity import SegmentData, SpriteEntity
+from entity import AiSpriteEntity, SpriteEntity
 from plugin import GenericPlugin
 import random
+
 
 class FishPlugin(GenericPlugin):
 
@@ -18,26 +19,46 @@ class FishPlugin(GenericPlugin):
         self.aise_context.groups[FishPlugin.GROUP_FISH] = 8
         self.fish_list = arcade.SpriteList()
         self.points = []
+        self.ai = None
+        self.fish_textures = []
 
     def setup(self):
+
+        self.ai = Ai(self.aise_context.config.plugins.fish.ai_function,
+                     self.aise_context.config.plugins.fish.ai_mode)
+
+
+        self.fish_textures.append(arcade.load_texture(
+            "assets/sprites/fish.png", 0, 0, 96, 96))
+        self.fish_textures.append(arcade.load_texture(
+            "assets/sprites/fish.png", 96, 0, 96, 96))
+        self.fish_textures.append(arcade.load_texture(
+            "assets/sprites/fish.png", 192, 0, 96, 96))
+
+        self.create_fishes()
+
+        self.aise_context.physics_engine.add_collision_handler(
+            self.aise_context.groups[AiseContext.GROUP_GROUND], self.aise_context.groups[FishPlugin.GROUP_FISH], post_handler=self.fish_hit_ground_handler)
+        self.aise_context.physics_engine.add_collision_handler(
+            self.aise_context.groups[FishPlugin.GROUP_FISH], self.aise_context.groups[FishPlugin.GROUP_FISH], post_handler=self.fish_hit_fish_handler)
+
+    def create_fishes(self):
+
         locations_available = list(
             range(0, len(self.aise_context.map_cache.water_sprites)))
         random.shuffle(locations_available)
 
-        fish_textures = []
-        fish_textures.append(arcade.load_texture(
-            "assets/sprites/fish.png", 0, 0, 96, 96))
-        fish_textures.append(arcade.load_texture(
-            "assets/sprites/fish.png", 96, 0, 96, 96))
-        fish_textures.append(arcade.load_texture(
-            "assets/sprites/fish.png", 192, 0, 96, 96))
-
         for i in range(0, self.aise_context.config.plugins.fish.count):
             water_ref = self.aise_context.map_cache.water_sprites[locations_available.pop(
             )]
-            fish_sprite = Fish(self.aise_context.config.plugins.fish.sensor_count)
+            fish_sprite = Fish(
+                sensor_count=self.aise_context.config.plugins.fish.sensor_count,
+                brain=self.ai.create_brain()
+            )
             fish_sprite.id = i
-            fish_sprite.textures = fish_textures
+            fish_sprite.brain.id = i
+            fish_sprite.brain.active = True
+            fish_sprite.textures = self.fish_textures
             fish_sprite.center_x = water_ref.center_x
             fish_sprite.center_y = water_ref.center_y
             fish_sprite.set_texture(0)
@@ -57,19 +78,25 @@ class FishPlugin(GenericPlugin):
 
             self.fish_list.append(fish_sprite)
 
-
-        self.aise_context.physics_engine.add_collision_handler(
-            self.aise_context.groups[AiseContext.GROUP_GROUND], self.aise_context.groups[FishPlugin.GROUP_FISH], post_handler=self.fish_hit_ground_handler)
-        self.aise_context.physics_engine.add_collision_handler(
-            self.aise_context.groups[FishPlugin.GROUP_FISH], self.aise_context.groups[FishPlugin.GROUP_FISH], post_handler=self.fish_hit_fish_handler)
+        self.ai.begin_generation( [ f.brain for f in self.fish_list ]  )
 
     def fish_hit_fish_handler(self, sprite_a, sprite_b, arbiter, space, data):
         self.aise_context.remove_sprite_lazy(sprite_a)
         self.aise_context.remove_sprite_lazy(sprite_b)
+        sprite_a.brain.active = False
+        sprite_b.brain.active = False
+        self.validate_generation()
 
     def fish_hit_ground_handler(self, sprite_a, sprite_b, arbiter, space, data):
         fish = sprite_a if isinstance(sprite_a, Fish) else sprite_b
+        fish.brain.active = False
         self.aise_context.remove_sprite_lazy(fish)
+        self.validate_generation()
+
+    def validate_generation(self):
+        if len(self.fish_list) - len(self.aise_context.sprites_to_remove) <= 0:
+            self.ai.end_generation()
+            self.create_fishes()
 
     def init(self):
         pass
@@ -95,7 +122,8 @@ class FishPlugin(GenericPlugin):
                     best_fishes[0] = fish
 
         for i, fish in enumerate(best_fishes):
-            self.aise_context.data_panel.add_label('#'+str(i)+': ' + str(fish.travelled))
+            self.aise_context.data_panel.add_label(
+                '#'+str(i)+': ' + str(fish.travelled))
 
     def draw(self):
         self.fish_list.draw()
@@ -116,9 +144,10 @@ class FishPlugin(GenericPlugin):
                 fo = self.aise_context.physics_engine.get_physics_object(fish)
                 fo.body.angle = fish.radians
 
-class Fish(SpriteEntity):
-    def __init__(self, sensor_count):
-        super().__init__(None, 0.4)
+
+class Fish(AiSpriteEntity):
+    def __init__(self, sensor_count: int, brain: Brain):
+        super().__init__(scale=0.4, brain=brain)
 
         self.r_x = 0
         self.r_y = 0
@@ -147,11 +176,8 @@ class Fish(SpriteEntity):
     def get_children(self):
         return []
 
-
     def move_forward(self, context: AiseContext):
         force = (0, context.config.plugins.fish.speed)
         context.physics_engine.apply_force(self, force)
         self.sensor_set.update(context)
         self.travelled += force[1] / 1000
-
-
