@@ -2,3 +2,5 @@ arcade==2.6.10
 Shapely==1.8.0
 PyYAML==6.0
 Munch==2.5.0
+torch==1.10.2+cpu
+torchvision==0.10.2+cpu

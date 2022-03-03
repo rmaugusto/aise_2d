@@ -74,8 +74,5 @@ class SensorSet:
         for sensor in self.sensors:
             sensor.draw()
 
-    def attach_space(self, space: pymunk.Space):
-        pass
-
-    def remove_space(self, space: pymunk.Space):
-        pass
+    def get_distances(self) -> List[float]:
+        return [sensor.distance for sensor in self.sensors]

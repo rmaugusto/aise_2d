@@ -18,15 +18,18 @@ class FishPlugin(GenericPlugin):
         super().__init__(aise_context)
         self.aise_context.groups[FishPlugin.GROUP_FISH] = 8
         self.fish_list = arcade.SpriteList()
-        self.points = []
         self.ai = None
         self.fish_textures = []
 
     def setup(self):
 
         self.ai = Ai(self.aise_context.config.plugins.fish.ai_function,
-                     self.aise_context.config.plugins.fish.ai_mode)
-
+                     self.aise_context.config.plugins.fish.ai_mode,
+                     self.aise_context.config.plugins.fish.sensor_count+2,
+                     self.aise_context.config.plugins.fish.ai_hidden_layers_count,
+                     self.aise_context.config.plugins.fish.ai_hidden_count,
+                     2
+                     )
 
         self.fish_textures.append(arcade.load_texture(
             "assets/sprites/fish.png", 0, 0, 96, 96))
@@ -53,7 +56,8 @@ class FishPlugin(GenericPlugin):
             )]
             fish_sprite = Fish(
                 sensor_count=self.aise_context.config.plugins.fish.sensor_count,
-                brain=self.ai.create_brain()
+                brain=self.ai.create_brain(),
+                energy=self.aise_context.config.plugins.fish.energy,
             )
             fish_sprite.id = i
             fish_sprite.brain.id = i
@@ -63,8 +67,6 @@ class FishPlugin(GenericPlugin):
             fish_sprite.center_y = water_ref.center_y
             fish_sprite.set_texture(0)
             fish_sprite.turn_left(random.randint(0, 360))
-            fish_sprite.sensor_set.attach_space(
-                self.aise_context.physics_engine.space)
 
             self.aise_context.physics_engine.add_sprite(fish_sprite,
                                                         friction=0.0,
@@ -78,20 +80,20 @@ class FishPlugin(GenericPlugin):
 
             self.fish_list.append(fish_sprite)
 
-        self.ai.begin_generation( [ f.brain for f in self.fish_list ]  )
+        self.ai.begin_generation([f.brain for f in self.fish_list])
 
     def fish_hit_fish_handler(self, sprite_a, sprite_b, arbiter, space, data):
         self.aise_context.remove_sprite_lazy(sprite_a)
         self.aise_context.remove_sprite_lazy(sprite_b)
         sprite_a.brain.active = False
         sprite_b.brain.active = False
-        self.validate_generation()
+        # self.validate_generation()
 
     def fish_hit_ground_handler(self, sprite_a, sprite_b, arbiter, space, data):
         fish = sprite_a if isinstance(sprite_a, Fish) else sprite_b
         fish.brain.active = False
         self.aise_context.remove_sprite_lazy(fish)
-        self.validate_generation()
+        # self.validate_generation()
 
     def validate_generation(self):
         if len(self.fish_list) - len(self.aise_context.sprites_to_remove) <= 0:
@@ -102,13 +104,22 @@ class FishPlugin(GenericPlugin):
         pass
 
     def update(self, delta_time):
+
         self.fish_list.update()
         self.fish_list.update_animation(delta_time)
 
         for fish in self.fish_list:
             fish.move_forward(self.aise_context)
+            fish.turn(self.aise_context)
+            self.remove_dead_fish(fish)
+
+        self.validate_generation()
 
         self.collect_best_fishes()
+
+    def remove_dead_fish(self, fish):
+        if fish.energy <= 0:
+            self.aise_context.remove_sprite_lazy(fish)
 
     def collect_best_fishes(self):
         # get 4 best fishes according to traveled distance
@@ -146,30 +157,31 @@ class FishPlugin(GenericPlugin):
 
 
 class Fish(AiSpriteEntity):
-    def __init__(self, sensor_count: int, brain: Brain):
+    def __init__(self, sensor_count: int, brain: Brain, energy: float):
         super().__init__(scale=0.4, brain=brain)
 
         self.r_x = 0
         self.r_y = 0
         self.travelled = 0
-        self.time_elapsed = 0
-        self.direction = 1
+        self.energy = energy
+        self.anim_time_elapsed = 0
+        self.anim_direction = 1
         self.sensor_set = SensorSet(self, sensor_count)
         self.id = 0
 
     def update_animation(self, delta_time: float = 1 / 60):
-        self.time_elapsed += delta_time
+        self.anim_time_elapsed += delta_time
 
         # TODO: Variar o tempo de acordo com a velocidade
-        if(self.time_elapsed >= 0.3):
-            self.time_elapsed = 0
+        if(self.anim_time_elapsed >= 0.3):
+            self.anim_time_elapsed = 0
 
-            self.cur_texture_index = self.cur_texture_index + self.direction
+            self.cur_texture_index = self.cur_texture_index + self.anim_direction
 
             if(self.cur_texture_index > 1):
-                self.direction = -1
+                self.anim_direction = -1
             elif(self.cur_texture_index < 1):
-                self.direction = 1
+                self.anim_direction = 1
 
             self.set_texture(self.cur_texture_index)
 
@@ -178,6 +190,23 @@ class Fish(AiSpriteEntity):
 
     def move_forward(self, context: AiseContext):
         force = (0, context.config.plugins.fish.speed)
+        travelled_diff = force[1] / 10000
         context.physics_engine.apply_force(self, force)
         self.sensor_set.update(context)
-        self.travelled += force[1] / 1000
+        self.travelled += travelled_diff
+        self.energy -= travelled_diff
+
+    def turn(self, context: AiseContext):
+        inputs = self.sensor_set.get_distances()
+        inputs.append(self.travelled)
+        inputs.append(self.energy)
+        outputs = self.brain.forward(inputs)
+
+        if outputs[0] and not outputs[1]:
+            self.turn_left(20)
+
+        if not outputs[0] and outputs[1]:
+            self.turn_right(20)
+
+        fo = context.physics_engine.get_physics_object(self)
+        fo.body.angle = self.radians

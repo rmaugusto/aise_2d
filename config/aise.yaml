@@ -3,5 +3,8 @@ plugins:
     count: 10
     sensor_count: 10
     speed: 4000
-    ai_function: scratch_relu_01
+    energy: 200
+    ai_function: pytorch_relu_01
+    ai_hidden_layers_count: 2
+    ai_hidden_count: 64
     ai_mode: training
