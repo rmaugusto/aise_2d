@@ -18,9 +18,15 @@ class PyTorchRelu01(ActivationFunction):
             nn.Linear(hidden_count, output_count),
         )
 
-        self.optimizer = optim.Adam(self.network.parameters(), lr=2.5e-4)
+        self.optimizer = optim.Adam(self.network.parameters(), lr=0.01)
         self.loss_func = nn.MSELoss()
 
     def forward(self, inputs: list[float]) -> list[bool]:
-        actions = self.network(torch.Tensor(np.array(inputs))).tolist()
-        return [True if x > 0 else False for x in actions]
+        self.optimizer.zero_grad()
+        output = self.network(torch.Tensor(np.array(inputs)))
+        loss = self.loss_func(output, torch.Tensor(np.array(inputs)))
+        loss.backward()
+        self.optimizer.step()
+
+        # actions = self.network(torch.Tensor(np.array(inputs))).tolist()
+        # return [True if x > 0 else False for x in actions]

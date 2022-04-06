@@ -189,7 +189,7 @@ class Fish(AiSpriteEntity):
         return []
 
     def move_forward(self, context: AiseContext):
-        force = (0, context.config.plugins.fish.speed)
+        force = (0, context.config.plugins.fish.force)
         travelled_diff = force[1] / 10000
         context.physics_engine.apply_force(self, force)
         self.sensor_set.update(context)
@@ -204,9 +204,11 @@ class Fish(AiSpriteEntity):
 
         if outputs[0] and not outputs[1]:
             self.turn_left(20)
+            self.energy -= 0.6
 
         if not outputs[0] and outputs[1]:
             self.turn_right(20)
+            self.energy -= 0.6
 
         fo = context.physics_engine.get_physics_object(self)
         fo.body.angle = self.radians
